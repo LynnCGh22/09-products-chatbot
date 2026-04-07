@@ -17,7 +17,7 @@ function initChat() {
     const conversation = [
         {
             role: 'system',
-            content: 'You are Offbeat Assistant for a vacation rental website. Ask 2-3 simple questions, then recommend the best matching rentals from the catalog. Keep responses friendly, concise, and easy to read.'
+            content: 'You are Offbeat Assistant for a vacation rental website. Ask 2-3 simple questions, then recommend the best matching rentals from the catalog. Use a formal, direct, business-oriented tone. Keep responses concise and format recommendations with clear line breaks or bullet points.'
         }
     ];
 
@@ -25,15 +25,15 @@ function initChat() {
     const guidedQuestions = [
         {
             key: 'vibe',
-            prompt: 'What kind of vibe do you want: spooky, playful, cozy, magical, weird, relaxed, or foodie?'
+            prompt: 'Please describe the experience you want: spooky, playful, cozy, magical, unusual, relaxed, or food-focused.'
         },
         {
             key: 'location',
-            prompt: 'Do you want a desert, city, mountains, or anywhere setting?'
+            prompt: 'Which setting do you prefer: desert, city, mountains, or no preference?'
         },
         {
             key: 'priority',
-            prompt: 'What matters most: highest rating, most unusual stay, or the most comfortable stay?'
+            prompt: 'What is your top priority: highest rating, most unusual stay, or most comfortable stay?'
         }
     ];
 
@@ -130,13 +130,13 @@ function initChat() {
     }
 
     function buildLocalRecommendation(matches) {
-        const lines = ['Here are your best matches:', ''];
+        const lines = ['Recommended matches:', ''];
 
         matches.forEach(function(rental, index) {
-            lines.push(`${index + 1}. ${rental.name}`);
-            lines.push(`   Location: ${rental.location}`);
-            lines.push(`   Rating: ${rental.avgRating}`);
-            lines.push(`   Why it fits: ${rental.description}`);
+            lines.push(`- ${index + 1}. ${rental.name}`);
+            lines.push(`  Location: ${rental.location}`);
+            lines.push(`  Rating: ${rental.avgRating}`);
+            lines.push(`  Why it fits: ${rental.description}`);
             lines.push('');
         });
 
@@ -198,10 +198,10 @@ function initChat() {
                     conversation[0],
                     {
                         role: 'system',
-                        content: `Use the rental catalog below and the shortlisted matches to write a short, friendly recommendation. Only recommend rentals from the shortlist. Format the response with clear line breaks or bullets.\n\nRental catalog:\n${rentalContext}\n\nShortlist:\n${shortlist}`
+                        content: `Use the rental catalog below and the shortlisted matches to write a short, formal recommendation. Only recommend rentals from the shortlist. Use a direct, business-oriented tone and format the response with clear line breaks or bullet points.\n\nRental catalog:\n${rentalContext}\n\nShortlist:\n${shortlist}`
                     }
                 ].concat(conversation.slice(1)),
-                temperature: 0.7
+                temperature: 0.3
             })
         });
 
@@ -214,7 +214,7 @@ function initChat() {
     }
 
     async function showRecommendations() {
-        const loadingMessage = addMessage('Finding your best matches...', 'bot');
+        const loadingMessage = addMessage('Preparing your recommendations...', 'bot');
         const matches = getTopMatches(userAnswers);
         const localFallback = buildLocalRecommendation(matches);
 
@@ -271,35 +271,6 @@ function initChat() {
     function startGuidedFlow() {
         addMessage('I can match you to a rental in 3 quick questions.', 'bot');
         askQuestion(0);
-    }
-
-    // Send the full conversation to OpenAI and return the assistant's reply.
-    async function getAssistantReplyLegacy() {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [
-                    conversation[0],
-                    {
-                        role: 'system',
-                        content: `Use the rental catalog below when recommending properties. Only suggest rentals from this list.\n\nRental catalog:\n${formatRentalsContext(rentalsCatalog)}`
-                    }
-                ].concat(conversation.slice(1)),
-                temperature: 0.7
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('OpenAI request failed');
-        }
-
-        const data = await response.json();
-        return data.choices[0].message.content.trim();
     }
 
     // Handle user input and process messages.

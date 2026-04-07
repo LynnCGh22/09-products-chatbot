@@ -9,6 +9,9 @@ function initChat() {
     const openIcon = document.querySelector('.open-icon');
     const closeIcon = document.querySelector('.close-icon');
 
+    // Store the rental catalog as model context once it loads.
+    let rentalsContext = 'No rental data is available right now.';
+
     // Keep the conversation history so we can send the full chat to OpenAI.
     const conversation = [
         {
@@ -38,6 +41,28 @@ function initChat() {
         return messageElement;
     }
 
+    // Turn the rentals data into a short, readable summary for the model.
+    function formatRentalsContext(rentals) {
+        return rentals.map(function(rental) {
+            return `- ${rental.name} | ${rental.location} | Rating: ${rental.avgRating}\n  ${rental.description}`;
+        }).join('\n');
+    }
+
+    // Load the rental catalog from rentals.json so the assistant can recommend from real data.
+    async function loadRentalsData() {
+        try {
+            const response = await fetch('./rentals.json');
+            if (!response.ok) {
+                throw new Error('Failed to load rentals.json');
+            }
+
+            const data = await response.json();
+            rentalsContext = formatRentalsContext(data.rentals || []);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
     // Send the full conversation to OpenAI and return the assistant's reply.
     async function getAssistantReply() {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -48,7 +73,13 @@ function initChat() {
             },
             body: JSON.stringify({
                 model: 'gpt-4o',
-                messages: conversation,
+                messages: [
+                    conversation[0],
+                    {
+                        role: 'system',
+                        content: `Use the rental catalog below when recommending properties. Only suggest rentals from this list.\n\nRental catalog:\n${rentalsContext}`
+                    }
+                ].concat(conversation.slice(1)),
                 temperature: 0.7
             })
         });
@@ -102,6 +133,9 @@ function initChat() {
 
     // Listen for form submission.
     chatForm.addEventListener('submit', handleUserInput);
+
+    // Load the rental data before the user starts chatting.
+    loadRentalsData();
 }
 
 // Initialize the chat interface.

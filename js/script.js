@@ -5,43 +5,104 @@ function initChat() {
     const chatBox = document.getElementById('chatBox');
     const userInput = document.getElementById('userInput');
     const chatMessages = document.getElementById('chatMessages');
+    const chatForm = document.getElementById('chatForm');
     const openIcon = document.querySelector('.open-icon');
     const closeIcon = document.querySelector('.close-icon');
 
-    // Toggle chat visibility and swap icons
+    // Keep the conversation history so we can send the full chat to OpenAI.
+    const conversation = [
+        {
+            role: 'system',
+            content: 'You are Offbeat Assistant for a vacation rental website. Be friendly, concise, and helpful.'
+        },
+        {
+            role: 'assistant',
+            content: 'Hello! How can I help you find your perfect offbeat retreat?'
+        }
+    ];
+
+    // Toggle chat visibility and swap icons.
     chatToggle.addEventListener('click', function() {
         chatBox.classList.toggle('active');
         openIcon.style.display = chatBox.classList.contains('active') ? 'none' : 'block';
         closeIcon.style.display = chatBox.classList.contains('active') ? 'block' : 'none';
     });
 
-    // Handle user input and process messages
-    function handleUserInput(e) {
+    // Add a message to the chat window.
+    function addMessage(text, sender) {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message', sender);
+        messageElement.textContent = text;
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return messageElement;
+    }
+
+    // Send the full conversation to OpenAI and return the assistant's reply.
+    async function getAssistantReply() {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: conversation,
+                temperature: 0.7
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('OpenAI request failed');
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content.trim();
+    }
+
+    // Handle user input and process messages.
+    async function handleUserInput(e) {
         e.preventDefault();
+
         const message = userInput.value.trim();
-        if (message) {
-            userInput.value = '';
 
-            // Display the user's message
-            const userMessage = document.createElement('div');
-            userMessage.classList.add('message', 'user');
-            userMessage.textContent = message;
-            chatMessages.appendChild(userMessage);
+        if (!message) {
+            return;
+        }
 
-            // Simulate bot response
-            const botMessage = document.createElement('div');
-            botMessage.classList.add('message', 'bot');
-            botMessage.textContent = "I'm here to help!"; // Replace with actual bot logic
-            chatMessages.appendChild(botMessage);
+        if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+            addMessage('Please add your OpenAI API key to js/secrets.js first.', 'bot');
+            return;
+        }
 
-            // Scroll to the latest message
+        userInput.value = '';
+        userInput.disabled = true;
+
+        // Save and show the user's message.
+        conversation.push({ role: 'user', content: message });
+        addMessage(message, 'user');
+
+        // Show a temporary loading message while the API request runs.
+        const loadingMessage = addMessage('Thinking...', 'bot');
+
+        try {
+            const assistantReply = await getAssistantReply();
+            conversation.push({ role: 'assistant', content: assistantReply });
+            loadingMessage.textContent = assistantReply;
+        } catch (error) {
+            console.error(error);
+            loadingMessage.textContent = 'Sorry, I could not get a response right now. Please try again.';
+        } finally {
+            userInput.disabled = false;
+            userInput.focus();
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
     }
 
-    // Listen for form submission
-    document.getElementById('chatForm').addEventListener('submit', handleUserInput);
+    // Listen for form submission.
+    chatForm.addEventListener('submit', handleUserInput);
 }
 
-// Initialize the chat interface
+// Initialize the chat interface.
 initChat();
